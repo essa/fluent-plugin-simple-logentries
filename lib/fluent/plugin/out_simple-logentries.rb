@@ -12,6 +12,7 @@ class Fluent::SimpleLogentriesOutput < Fluent::BufferedOutput
   config_param :protocol,       :string,  :default => 'tcp'
   config_param :max_retries,    :integer, :default => 3
   config_param :append_tag,     :bool,    :default => true
+  config_param :wait_after_unexpected_error,    :integer, :default => 5
   config_param :token,          :string
   SSL_HOST    = "api.logentries.com"
   NO_SSL_HOST = "data.logentries.com"
@@ -85,13 +86,14 @@ class Fluent::SimpleLogentriesOutput < Fluent::BufferedOutput
     end
   rescue => e
     log.warn "Could not push logs to Logentries. #{e.message}"
+    sleep @wait_after_unexpected_error
   end
 
   def push(data)
     retries = 0
     begin
       client.write("#{@token} #{data} \n")
-    rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT => e
+    rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT, Errno::EPIPE => e
       if retries < @max_retries
         retries += 1
         @_socket = nil
